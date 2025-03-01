@@ -192,6 +192,8 @@ def repeated_forward_a_star(grid, start, goal, favor_high_g):
             if current == goal:
                 is_Path = True
                 return full_path, expanded, is_Path
+            
+    return None, 0, is_Path
 
 def repeated_backward_a_star(grid, start, goal):
     is_Path = False
@@ -270,7 +272,70 @@ def repeated_backward_a_star(grid, start, goal):
                 is_Path = True
                 return full_path, expanded, is_Path
 
-    return full_path, expanded, is_Path
+    return None, 0, is_Path
+
+
+def adaptive_a_star(grid, start, goal):
+    isPath = False
+
+    def path(prev, curr):
+        path = []
+        while curr in prev:
+            path.append(curr)
+            curr = prev[curr]
+        path.append(curr)
+        
+        return path[::-1]
+
+    def is_start_blocked(start, grid):
+        x, y = start
+        neighbors = [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)]
+        for nx, ny in neighbors:
+            if 0 <= nx < len(grid[0]) and 0 <= ny < len(grid) and grid[ny][nx] == 'unblocked':
+                return False  
+        return True
+
+    open_list = BinaryHeap()
+    open_list.push((heuristic(start, goal), 0, start))
+    closed_set = set()
+    previous_position = {}
+    g_values = {start: 0}
+    h_values = {}
+
+    if is_start_blocked(start, grid):
+        return None, 0, isPath
+
+    while not open_list.empty():
+        f, g, current = open_list.pop()
+
+        if current in closed_set:
+            continue
+
+        if current == goal:
+            distance = g_values[current]
+            for state in closed_set:
+                h_values[state] = max(h_values.get(state, 0), distance - g_values[state])
+
+            isPath = True
+            return path(previous_position, current), len(closed_set), isPath
+
+        closed_set.add(current)
+
+        for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
+            neighbor = (current[0] + dx, current[1] + dy)
+
+            if (neighbor in closed_set or 
+                not (0 <= neighbor[0] < len(grid) and 0 <= neighbor[1] < len(grid[0])) or grid[neighbor[0]][neighbor[1]] == 0):
+                continue
+
+            new_g = g + 1
+            if neighbor not in g_values or new_g < g_values[neighbor]:
+                g_values[neighbor] = new_g
+                h = h_values.get(neighbor, heuristic(neighbor, goal))
+                open_list.push((new_g + h, -new_g, neighbor))
+                previous_position[neighbor] = current
+
+    return None, len(closed_set), isPath
 
 def draw_path_on_grid(grid, path, start, goal, filename, method):
     size = len(grid)
@@ -310,11 +375,11 @@ def draw_path_on_grid(grid, path, start, goal, filename, method):
 
     image.save(filename)
 
-
 folder_name = "Mazes"
 forward_low_g_folder = "Forward_Low_G"
 forward_high_g_folder = "Forward_High_G"
 backward_folder = "Backward"
+adaptive_folder = "Adaptive"
 
 if not os.path.exists(folder_name):
     os.makedirs(folder_name)
@@ -328,9 +393,18 @@ if not os.path.exists(forward_high_g_folder):
 if not os.path.exists(backward_folder):
     os.makedirs(backward_folder)
 
+if not os.path.exists(adaptive_folder):
+    os.makedirs(adaptive_folder)
+
 total1_times = []
 total2_times = []
 total3_times = []
+total4_times = []
+
+total_exp1 = []
+total_exp2 = []
+total_exp3 = []
+total_exp4 = []
 
 for i in range(50):
     grid, start, goal = generate_gridworld()
@@ -351,10 +425,21 @@ for i in range(50):
     path3, expanded3, istrue3 = repeated_backward_a_star(grid, start, goal) 
     end_time3 = time.time()
     total3 = end_time3 - start_time3
+
+    start_time4 = time.time()
+    path4, expanded4, istrue4 = adaptive_a_star(grid, start, goal)
+    end_time4 = time.time()
+    total4 = end_time4 - start_time4
     
     total1_times.append(total1)
     total2_times.append(total2)
     total3_times.append(total3)
+    total4_times.append(total4)
+
+    total_exp1.append(expanded1)
+    total_exp2.append(expanded2)
+    total_exp3.append(expanded3)
+    total_exp4.append(expanded4)
     
     print(f"\nMaze {i}: Start:{start} End:{goal}")
     print(f"Is There Path?: {istrue1}")
@@ -376,16 +461,36 @@ for i in range(50):
     if(istrue3):
         back = os.path.join(backward_folder, f"maze_{i}_path.png")
         draw_path_on_grid(grid, path3, start, goal, back, 3)
+    
+    print("Adaptive high-g:", expanded4)
+    print("Runtime:", total4)
+    if(istrue4):
+        adapt = os.path.join(adaptive_folder, f"maze_{i}_path.png")
+        draw_path_on_grid(grid, path4, start, goal, adapt, 4)
 
 average_total1 = sum(total1_times) / len(total1_times)
 average_total2 = sum(total2_times) / len(total2_times)
 average_total3 = sum(total3_times) / len(total3_times)
+average_total4 = sum(total4_times) / len(total4_times)
 
-print(sum(total1_times))
-print(sum(total2_times))
-print(sum(total3_times))
-print(f"\nAverage runtime for Repeated Forward low-g: {average_total1}")
-print(f"Average runtime for Repeated Forward high-g: {average_total2}")
-print(f"Average runtime for Repeated Backward: {average_total3}")
+average_exp1 = sum(total_exp1) / len(total_exp1)
+average_exp2 = sum(total_exp2) / len(total_exp2)
+average_exp3 = sum(total_exp3) / len(total_exp3)
+average_exp4 = sum(total_exp4) / len(total_exp4)
 
-print(f"Generated and saved 50 Mazes in the '{folder_name}' folder.")
+print(f"\nAverage Runtime for Repeated Forward A* Low-g: {average_total1}")
+print(f"Average Runtime for Repeated Forward A* High-g: {average_total2}")
+print(f"Average Expanded Cells for Repeated Forward A* Low-g: {average_exp1}")
+print(f"Average Expanded Cells for Repeated Forward A* High-g: {average_exp2}")
+
+print(f"\nAverage Runtime for Repeated Forward A* High-g: {average_total2}")
+print(f"Average Runtime for Repeated Backward A* High-g: {average_total3}")
+print(f"Average Expanded Cells for Repeated Forward A* High-g: {average_exp2}")
+print(f"Average Expanded Cells for Repeated Backward A* High-g: {average_exp3}")
+
+print(f"\nAverage Runtime for Repeated Forward A* High-g: {average_total2}")
+print(f"Average Runtime for Adaptive A* High-g: {average_total4}")
+print(f"Average Expanded Cells for Repeated Forward A* High-g: {average_exp2}")
+print(f"Average Expanded Cells for Adaptive A* High-g: {average_exp4}")
+
+print(f"\nGenerated and saved 50 Mazes in the '{folder_name}' folder.")
