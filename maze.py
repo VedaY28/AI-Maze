@@ -276,7 +276,7 @@ def repeated_backward_a_star(grid, start, goal):
 
 
 def adaptive_a_star(grid, start, goal):
-    isPath = False
+    is_Path = False
 
     def path(prev, curr):
         path = []
@@ -286,7 +286,7 @@ def adaptive_a_star(grid, start, goal):
         path.append(curr)
         
         return path[::-1]
-
+    
     def is_start_blocked(start, grid):
         x, y = start
         neighbors = [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)]
@@ -294,16 +294,18 @@ def adaptive_a_star(grid, start, goal):
             if 0 <= nx < len(grid[0]) and 0 <= ny < len(grid) and grid[ny][nx] == 'unblocked':
                 return False  
         return True
-
+    
     open_list = BinaryHeap()
     open_list.push((heuristic(start, goal), 0, start))
+
     closed_set = set()
-    previous_position = {}
+    
+    previous = {}
     g_values = {start: 0}
     h_values = {}
 
     if is_start_blocked(start, grid):
-        return None, 0, isPath
+        return None, 0, is_Path
 
     while not open_list.empty():
         f, g, current = open_list.pop()
@@ -315,9 +317,8 @@ def adaptive_a_star(grid, start, goal):
             distance = g_values[current]
             for state in closed_set:
                 h_values[state] = max(h_values.get(state, 0), distance - g_values[state])
-
-            isPath = True
-            return path(previous_position, current), len(closed_set), isPath
+            is_Path = True
+            return path(previous, current), len(closed_set), is_Path
 
         closed_set.add(current)
 
@@ -325,7 +326,8 @@ def adaptive_a_star(grid, start, goal):
             neighbor = (current[0] + dx, current[1] + dy)
 
             if (neighbor in closed_set or 
-                not (0 <= neighbor[0] < len(grid) and 0 <= neighbor[1] < len(grid[0])) or grid[neighbor[0]][neighbor[1]] == 0):
+                not (0 <= neighbor[0] < len(grid[0]) and 0 <= neighbor[1] < len(grid)) or 
+                grid[neighbor[1]][neighbor[0]] == 'blocked'):
                 continue
 
             new_g = g + 1
@@ -333,9 +335,9 @@ def adaptive_a_star(grid, start, goal):
                 g_values[neighbor] = new_g
                 h = h_values.get(neighbor, heuristic(neighbor, goal))
                 open_list.push((new_g + h, -new_g, neighbor))
-                previous_position[neighbor] = current
+                previous[neighbor] = current
 
-    return None, len(closed_set), isPath
+    return None, len(closed_set), is_Path
 
 def draw_path_on_grid(grid, path, start, goal, filename, method):
     size = len(grid)
